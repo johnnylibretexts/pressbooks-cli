@@ -1,0 +1,47 @@
+{
+  "_comment": [
+    "The Pressbooks networks this tool offers. There is no directory API that enumerates them, so this list ships with the binary.",
+    "Every entry was probed on 2026-09-04 with the User-Agent this tool sends. That matters: these hosts answer an unrecognised client with 403, so a probe with a bare tool name reports far more of them unreachable than really are.",
+    "Probe with a Go net/http client, not curl. Cloudflare's bot detection keys on the TLS and HTTP fingerprint as well as the User-Agent, and curl and Go present different fingerprints for the same headers. A curl-based probe wrongly reported pressbooks.bccampus.ca and opentextbc.ca as blocked; a Go client reaches both fine, and they were moved here from `excluded` on 2026-09-04 once that was found.",
+    "`books` is what was observed at that probe and conveys scale only. The live count comes from the X-WP-Total header at crawl time.",
+    "`excluded` exists so a host nobody can reach is not re-added later by someone who rediscovers the problem by hand. Do not move an entry out of it without re-probing with a Go client and recording what changed."
+  ],
+  "networks": [
+    {"host": "ecampusontario.pressbooks.pub", "name": "eCampusOntario Open Authoring Platform", "books": 3078},
+    {"host": "pressbooks.online.ucf.edu", "name": "University of Central Florida Pressbooks", "books": 1939},
+    {"host": "pressbooks.bccampus.ca", "name": "British Columbia/Yukon Open Authoring Platform", "books": 862},
+    {"host": "uw.pressbooks.pub", "name": "University of Washington Libraries", "books": 372},
+    {"host": "boisestate.pressbooks.pub", "name": "Boise State Pressbooks", "books": 320},
+    {"host": "pressbooks.cuny.edu", "name": "CUNY Pressbooks Network", "books": 263},
+    {"host": "open.maricopa.edu", "name": "Maricopa Open Digital Press", "books": 257},
+    {"host": "uen.pressbooks.pub", "name": "UEN Pressbooks Consortium", "books": 243},
+    {"host": "pressbooks.library.torontomu.ca", "name": "Toronto Metropolitan University Pressbooks", "books": 215},
+    {"host": "opentextbc.ca", "name": "BCcampus Open Publishing", "books": 212},
+    {"host": "pressbooks.nebraska.edu", "name": "University of Nebraska Pressbooks", "books": 211},
+    {"host": "idaho.pressbooks.pub", "name": "Idaho Open Press", "books": 195, "note": "cwi.pressbooks.pub redirects here."},
+    {"host": "kpu.pressbooks.pub", "name": "Kwantlen Polytechnic University Publishing", "books": 188},
+    {"host": "open.lib.umn.edu", "name": "University of Minnesota Libraries Publishing", "books": 174},
+    {"host": "openoregon.pressbooks.pub", "name": "Open Oregon Educational Resources", "books": 174},
+    {"host": "ohiostate.pressbooks.pub", "name": "The Ohio State University Pressbooks", "books": 114},
+    {"host": "wsu.pressbooks.pub", "name": "Open Text WSU", "books": 104, "note": "opentext.wsu.edu redirects here."},
+    {"host": "louis.pressbooks.pub", "name": "LOUIS Pressbooks", "books": 103},
+    {"host": "milnepublishing.geneseo.edu", "name": "Milne Publishing", "books": 90},
+    {"host": "iastate.pressbooks.pub", "name": "Iowa State University Open Books", "books": 85},
+    {"host": "viva.pressbooks.pub", "name": "VIVA Open Publishing", "books": 80},
+    {"host": "pressbooks.usnh.edu", "name": "University System of New Hampshire Pressbooks", "books": 74, "note": "Self-reports the WordPress default network title 'My blog Sites'; named here for the institution that runs it."},
+    {"host": "open.library.okstate.edu", "name": "Open OKState", "books": 63},
+    {"host": "pressbooks.lib.vt.edu", "name": "Pressbooks at Virginia Tech", "books": 46},
+    {"host": "oer.pressbooks.pub", "name": "PressbooksOER", "books": 43},
+    {"host": "rotel.pressbooks.pub", "name": "Remixing Open Textbooks through an Equity Lens (ROTEL)", "books": 38},
+    {"host": "ncstate.pressbooks.pub", "name": "NC State University Libraries Sites", "books": 34},
+    {"host": "odp.library.tamu.edu", "name": "Texas A&M University System Open Digital Publishing Sites", "books": 24}
+  ],
+  "excluded": [
+    {"host": "pressbooks.pub", "reason": "HTTP 403 Cloudflare managed challenge. Unlike pressbooks.bccampus.ca and opentextbc.ca, which are also Cloudflare-fronted but reachable, this host blocks a Go client's fingerprint too. This is the Pressbooks Directory host; its api.pressbooks.com backend is an undocumented JavaScript application, not a public API."},
+    {"host": "oer.hawaii.edu", "reason": "HTTP 404 rest_no_route. Reachable, but serves no Pressbooks v2 API."},
+    {"host": "oer.galileo.usg.edu", "reason": "HTTP 404 with an ordinary HTML error page, not rest_no_route JSON. Reachable, but serves no Pressbooks v2 API."},
+    {"host": "fanshawe.pressbooks.pub", "reason": "DNS lookup fails, no such host. The domain no longer resolves."},
+    {"host": "library.achievingthedream.org", "reason": "DNS lookup fails, no such host."},
+    {"host": "montana.pressbooks.net", "reason": "TCP connection to 216.40.34.41:443 times out."}
+  ]
+}

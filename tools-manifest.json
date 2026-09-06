@@ -1,0 +1,136 @@
+{
+  "api_name": "pressbooks",
+  "base_url": "https://{host}",
+  "description": "Search, inspect, and extract open textbooks published across Pressbooks networks — WordPress multisite installations exposing the Pressbooks REST API v2.",
+  "interface": "cli",
+  "http_transport": "standard",
+  "auth": {
+    "type": "none"
+  },
+  "agent_contract": {
+    "schema_version": "1",
+    "discover_command": "pressbooks-pp-cli schema --agent",
+    "response_format": "compact_json_envelope",
+    "response_stream": "stdout",
+    "list_continuation": "next_offset",
+    "text_continuation": "next_start_char",
+    "defaults": {
+      "networks_limit": 26,
+      "books_limit": 10,
+      "search_limit": 5,
+      "toc_limit": 20,
+      "extract_page_limit": 1,
+      "extract_max_chars": 12000,
+      "extract_delay_ms": 100
+    },
+    "download_requires_output": true,
+    "raw_html_in_agent_mode": false,
+    "partial_failure_field": "meta.skipped_networks",
+    "error_codes": [
+      {"code": "book_not_found", "retryable": false, "meaning": "The URL is not a Pressbooks book, or no such book exists at that host."},
+      {"code": "page_not_found", "retryable": false, "meaning": "No such page in this book."},
+      {"code": "network_not_found", "retryable": false, "meaning": "--host names a host with no Pressbooks v2 API."},
+      {"code": "blocked_by_host", "retryable": true, "meaning": "The host is refusing this client. Usually temporary rate limiting, which clears on its own; occasionally a permanent block. Wait before retrying, and give up after a few attempts rather than immediately."},
+      {"code": "export_unavailable", "retryable": false, "meaning": "This book offers no such export format."},
+      {"code": "invalid_arguments", "retryable": false, "meaning": "Conflicting, malformed, or unrecognized flags or subcommand."},
+      {"code": "unknown_command", "retryable": false, "meaning": "The subcommand named is not one this tool has."},
+      {"code": "timeout", "retryable": true, "meaning": "Deadline exceeded."},
+      {"code": "rate_limited", "retryable": true, "meaning": "HTTP 429 from the host."},
+      {"code": "upstream_error", "retryable": true, "meaning": "HTTP 5xx from the host."},
+      {"code": "network_error", "retryable": true, "meaning": "A transport failure (DNS, connection, TLS) reaching the host."},
+      {"code": "file_error", "retryable": false, "meaning": "Could not write the output path."},
+      {"code": "invalid_offset", "retryable": false, "meaning": "--offset must be zero or greater."},
+      {"code": "invalid_limit", "retryable": false, "meaning": "--limit must be zero or greater."},
+      {"code": "limit_too_large", "retryable": false, "meaning": "--limit exceeds this command's agent maximum."},
+      {"code": "output_required", "retryable": false, "meaning": "Agent mode requires an explicit --output or --dir path before writing a file."},
+      {"code": "invalid_download_kind", "retryable": false, "meaning": "--kind is not a supported export or extraction kind."},
+      {"code": "conflicting_page_selection", "retryable": false, "meaning": "--page and --all were both given."},
+      {"code": "conflicting_text_offset", "retryable": false, "meaning": "--start-char and --all were both given."},
+      {"code": "invalid_start_char", "retryable": false, "meaning": "--start-char must be zero or greater."},
+      {"code": "start_char_out_of_range", "retryable": false, "meaning": "--start-char exceeds the page's total character count."},
+      {"code": "invalid_max_chars", "retryable": false, "meaning": "--max-chars must be at least 1."},
+      {"code": "max_chars_too_large", "retryable": false, "meaning": "--max-chars exceeds the agent maximum of 50000."},
+      {"code": "invalid_format", "retryable": false, "meaning": "--format is not text, json, or html."},
+      {"code": "invalid_delay", "retryable": false, "meaning": "--delay must be zero or greater."},
+      {"code": "unsupported_agent_option", "retryable": false, "meaning": "A flag (such as --include-html) was combined with --agent, which does not support it."},
+      {"code": "operation_failed", "retryable": false, "meaning": "An uncategorized failure; no more specific code applies."}
+    ]
+  },
+  "required_headers": [
+    {
+      "name": "User-Agent",
+      "value": "Mozilla/5.0 (compatible; pressbooks-pp-cli/0.1; +https://github.com/johnnylibretexts/pressbooks-cli)"
+    },
+    {
+      "name": "Accept",
+      "value": "application/json"
+    }
+  ],
+  "tools": [
+    {
+      "name": "network_books_list",
+      "description": "Fetch one page of a Pressbooks network's book listing.",
+      "method": "GET",
+      "path": "/wp-json/pressbooks/v2/books",
+      "no_auth": true,
+      "params": [
+        {"name": "host", "type": "string", "location": "path", "required": true},
+        {"name": "per_page", "type": "int", "location": "query", "required": false},
+        {"name": "page", "type": "int", "location": "query", "required": false}
+      ]
+    },
+    {
+      "name": "network_books_count",
+      "description": "Fetch the live book count for a network from the X-WP-Total response header.",
+      "method": "GET",
+      "path": "/wp-json/pressbooks/v2/books?per_page=1",
+      "no_auth": true,
+      "params": [
+        {"name": "host", "type": "string", "location": "path", "required": true}
+      ]
+    },
+    {
+      "name": "book_metadata_get",
+      "description": "Fetch one book's title, subtitle, authors, license, language, copyright year, and word count.",
+      "method": "GET",
+      "path": "/wp-json/pressbooks/v2/metadata",
+      "no_auth": true,
+      "params": [
+        {"name": "host", "type": "string", "location": "path", "required": true}
+      ]
+    },
+    {
+      "name": "book_export_probe",
+      "description": "Probe whether a publisher export format exists for a book.",
+      "method": "HEAD",
+      "path": "/open/download",
+      "no_auth": true,
+      "params": [
+        {"name": "host", "type": "string", "location": "path", "required": true},
+        {"name": "type", "type": "string", "location": "query", "required": true}
+      ]
+    },
+    {
+      "name": "book_toc_get",
+      "description": "Fetch a book's complete table of contents in reading order.",
+      "method": "GET",
+      "path": "/wp-json/pressbooks/v2/toc",
+      "no_auth": true,
+      "params": [
+        {"name": "host", "type": "string", "location": "path", "required": true}
+      ]
+    },
+    {
+      "name": "page_content_get",
+      "description": "Fetch one page's rendered HTML content by id.",
+      "method": "GET",
+      "path": "/wp-json/pressbooks/v2/{type}/{id}",
+      "no_auth": true,
+      "params": [
+        {"name": "host", "type": "string", "location": "path", "required": true},
+        {"name": "type", "type": "string", "location": "path", "required": true, "enum": ["front-matter", "chapters", "back-matter"]},
+        {"name": "id", "type": "int", "location": "path", "required": true}
+      ]
+    }
+  ]
+}

@@ -1,0 +1,11 @@
+/bin/
+/pressbooks-cli
+/pressbooks-pp-cli
+.DS_Store
+
+# Reference dump of johnnylibretexts/libretexts-reader used while designing this
+# tool. Not part of the project and 1.5 MB of someone else's source.
+johnnylibretexts-libretexts-reader-*.txt
+
+# Local trial/report scratch, never published
+consumer-trial-report.md

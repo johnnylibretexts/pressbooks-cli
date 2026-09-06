@@ -1,0 +1,169 @@
+name: pressbooks
+description: "Search, inspect, and extract open textbooks published across Pressbooks networks (WordPress multisite installations exposing the Pressbooks REST API v2)"
+version: "0.1.0"
+category: education
+base_url: "https://{host}"
+http_transport: standard
+health_check_path: "/wp-json/pressbooks/v2/books?per_page=1"
+cli_description: "Search Pressbooks open textbook networks and extract a book's metadata, table of contents, page content, or complete text/html/json from your terminal."
+
+required_headers:
+  - name: User-Agent
+    value: "Mozilla/5.0 (compatible; pressbooks-pp-cli/0.1; +https://github.com/johnnylibretexts/pressbooks-cli)"
+  - name: Accept
+    value: "application/json"
+
+auth:
+  type: none
+
+agent_contract:
+  schema_version: "1"
+  discover_command: "pressbooks-pp-cli schema --agent"
+  response_format: compact_json_envelope
+  success_fields: [schema_version, ok, data, meta]
+  error_fields: [schema_version, ok, error]
+  pagination_fields: [offset, limit, total, has_more, next_offset]
+  text_continuation_fields: [char_start, char_end, total_chars, truncated, next_start_char]
+  defaults:
+    networks_limit: 26
+    books_limit: 10
+    search_limit: 5
+    toc_limit: 20
+    extract_page_limit: 1
+    extract_max_chars: 12000
+    extract_delay_ms: 100
+  constraints:
+    - "Agent JSON is emitted as one compact line."
+    - "Agent JSON is written to stdout for both success and error responses."
+    - "Agent extraction does not return raw HTML."
+    - "Agent downloads, and extract --dir, require an explicit output path."
+    - "A network sweep reports partial failures in meta.skipped_networks as {host, reason} objects."
+    - "books --host and search --host warn on stderr when the network's catalog is only partially synced."
+    - "Whole-book extraction (extract --all, download --kind text|json|html) paces page fetches with --delay, default 100ms."
+  # The authoritative list is schema --agent's own error_codes array; this
+  # mirrors it so a spec reader does not need to run the tool first. Keep
+  # both in step — see internal/cli/errorcodes_test.go, which fails the Go
+  # test suite if the schema's own list silently loses a code, though it
+  # cannot check this YAML mirror for you.
+  error_codes:
+    - {code: book_not_found, retryable: false, meaning: "The URL is not a Pressbooks book, or no such book exists at that host."}
+    - {code: page_not_found, retryable: false, meaning: "No such page in this book."}
+    - {code: network_not_found, retryable: false, meaning: "--host names a host with no Pressbooks v2 API."}
+    - {code: blocked_by_host, retryable: true, meaning: "The host is refusing this client. Usually temporary rate limiting, which clears on its own; occasionally a permanent block. Wait before retrying, and give up after a few attempts rather than immediately."}
+    - {code: export_unavailable, retryable: false, meaning: "This book offers no such export format."}
+    - {code: invalid_arguments, retryable: false, meaning: "Conflicting, malformed, or unrecognized flags or subcommand."}
+    - {code: unknown_command, retryable: false, meaning: "The subcommand named is not one this tool has."}
+    - {code: timeout, retryable: true, meaning: "Deadline exceeded."}
+    - {code: rate_limited, retryable: true, meaning: "HTTP 429 from the host."}
+    - {code: upstream_error, retryable: true, meaning: "HTTP 5xx from the host."}
+    - {code: network_error, retryable: true, meaning: "A transport failure (DNS, connection, TLS) reaching the host."}
+    - {code: file_error, retryable: false, meaning: "Could not write the output path."}
+    - {code: invalid_offset, retryable: false, meaning: "--offset must be zero or greater."}
+    - {code: invalid_limit, retryable: false, meaning: "--limit must be zero or greater."}
+    - {code: limit_too_large, retryable: false, meaning: "--limit exceeds this command's agent maximum."}
+    - {code: output_required, retryable: false, meaning: "Agent mode requires an explicit --output or --dir path before writing a file."}
+    - {code: invalid_download_kind, retryable: false, meaning: "--kind is not a supported export or extraction kind."}
+    - {code: conflicting_page_selection, retryable: false, meaning: "--page and --all were both given."}
+    - {code: conflicting_text_offset, retryable: false, meaning: "--start-char and --all were both given."}
+    - {code: invalid_start_char, retryable: false, meaning: "--start-char must be zero or greater."}
+    - {code: start_char_out_of_range, retryable: false, meaning: "--start-char exceeds the page's total character count."}
+    - {code: invalid_max_chars, retryable: false, meaning: "--max-chars must be at least 1."}
+    - {code: max_chars_too_large, retryable: false, meaning: "--max-chars exceeds the agent maximum of 50000."}
+    - {code: invalid_format, retryable: false, meaning: "--format is not text, json, or html."}
+    - {code: invalid_delay, retryable: false, meaning: "--delay must be zero or greater."}
+    - {code: unsupported_agent_option, retryable: false, meaning: "A flag (such as --include-html) was combined with --agent, which does not support it."}
+    - {code: operation_failed, retryable: false, meaning: "An uncategorized failure; no more specific code applies."}
+
+resources:
+  network_books:
+    description: "A Pressbooks network's book listing (paginated, 10 per page maximum, no working search parameter)"
+    endpoints:
+      list:
+        method: GET
+        path: "/wp-json/pressbooks/v2/books"
+        description: "Fetch one page of a network's books; per_page is capped at 10 by the upstream API"
+        response_format: json
+      count:
+        method: GET
+        path: "/wp-json/pressbooks/v2/books?per_page=1"
+        description: "Cheap live book count from the X-WP-Total response header, used to check catalog staleness"
+        response_format: json
+  book_metadata:
+    description: "A single book's metadata and license"
+    endpoints:
+      get:
+        method: GET
+        path: "/wp-json/pressbooks/v2/metadata"
+        description: "Fetch title, subtitle, authors, license, language, copyright year, and word count"
+        response_format: json
+      export_probe:
+        method: HEAD
+        path: "/open/download"
+        description: "Probe export availability with type=KIND; 200 means the format exists, 500 means it does not"
+        response_format: none
+  book_toc:
+    description: "A book's table of contents"
+    endpoints:
+      get:
+        method: GET
+        path: "/wp-json/pressbooks/v2/toc"
+        description: "Fetch front matter, parts, chapters, and back matter in reading order, in one request"
+        response_format: json
+  page_content:
+    description: "One page's rendered HTML content"
+    endpoints:
+      get:
+        method: GET
+        path: "/wp-json/pressbooks/v2/{type}/{id}"
+        description: "Fetch one page by id; type is front-matter, chapters, or back-matter"
+        response_format: json
+
+types:
+  Book:
+    fields:
+      - name: url
+        type: string
+      - name: title
+        type: string
+      - name: authors
+        type: array
+      - name: license_name
+        type: string
+      - name: license_url
+        type: string
+      - name: language
+        type: string
+      - name: copyright_year
+        type: string
+      - name: word_count
+        type: int
+      - name: host
+        type: string
+      - name: network_name
+        type: string
+  Page:
+    fields:
+      - name: id
+        type: int
+      - name: type
+        type: string
+      - name: slug
+        type: string
+      - name: title
+        type: string
+  ExtractedPage:
+    fields:
+      - name: book_url
+        type: string
+      - name: page_id
+        type: int
+      - name: page_title
+        type: string
+      - name: page_slug
+        type: string
+      - name: source_url
+        type: string
+      - name: text
+        type: string
+      - name: html
+        type: string
